@@ -1,0 +1,413 @@
+"""
+University GPA Calculation System
+Handles student enrollment, grade assignment, and GPA calculation
+"""
+
+class Course:
+    """Represents a university course"""
+    
+    def __init__(self, course_id, name, credits):
+        """
+        Initialize a course
+        
+        Args:
+            course_id (str): Unique course identifier
+            name (str): Course name
+            credits (int): Number of credit hours
+        """
+        if credits <= 0:
+            raise ValueError("Credits must be positive")
+        
+        self.course_id = course_id
+        self.name = name
+        self.credits = credits
+    
+    def __repr__(self):
+        return f"Course({self.course_id}, {self.name}, {self.credits} credits)"
+
+
+class Grade:
+    """Represents a grade with validation"""
+    
+    # Grade to GPA mapping (4.0 scale)
+    GRADE_POINTS = {
+        'A+': 4.0, 'A': 4.0, 'A-': 3.7,
+        'B+': 3.3, 'B': 3.0, 'B-': 2.7,
+        'C+': 2.3, 'C': 2.0, 'C-': 1.7,
+        'D+': 1.3, 'D': 1.0, 'D-': 0.7,
+        'F': 0.0
+    }
+    
+    def __init__(self, letter_grade):
+        """
+        Initialize a grade
+        
+        Args:
+            letter_grade (str): Letter grade (A+, A, A-, B+, etc.)
+        
+        Raises:
+            ValueError: If grade is invalid
+        """
+        if letter_grade not in self.GRADE_POINTS:
+            raise ValueError(f"Invalid grade: {letter_grade}. "
+                           f"Valid grades: {list(self.GRADE_POINTS.keys())}")
+        
+        self.letter_grade = letter_grade
+        self.grade_point = self.GRADE_POINTS[letter_grade]
+    
+    def __repr__(self):
+        return f"Grade({self.letter_grade}, {self.grade_point})"
+
+
+class Student:
+    """Represents a student with course enrollments and grades"""
+    
+    def __init__(self, student_id, name):
+        """
+        Initialize a student
+        
+        Args:
+            student_id (str): Unique student identifier
+            name (str): Student name
+        """
+        self.student_id = student_id
+        self.name = name
+        self.enrollments = {}  # {course_id: {'course': Course, 'grade': Grade}}
+    
+    def enroll_course(self, course):
+        """
+        Enroll student in a course
+        
+        Args:
+            course (Course): Course to enroll in
+        """
+        if course.course_id in self.enrollments:
+            raise ValueError(f"Already enrolled in {course.course_id}")
+        
+        self.enrollments[course.course_id] = {
+            'course': course,
+            'grade': None
+        }
+    
+    def assign_grade(self, course_id, letter_grade):
+        """
+        Assign a grade to a course
+        
+        Args:
+            course_id (str): Course identifier
+            letter_grade (str): Letter grade to assign
+        
+        Raises:
+            ValueError: If not enrolled in course or invalid grade
+        """
+        if course_id not in self.enrollments:
+            raise ValueError(f"Not enrolled in course {course_id}")
+        
+        grade = Grade(letter_grade)  # This validates the grade
+        self.enrollments[course_id]['grade'] = grade
+    
+    def calculate_gpa(self):
+        """
+        Calculate GPA based on all graded courses
+        
+        Returns:
+            float: GPA on 4.0 scale, or 0.0 if no courses
+        """
+        total_points = 0.0
+        total_credits = 0
+        
+        for enrollment in self.enrollments.values():
+            grade = enrollment['grade']
+            course = enrollment['course']
+            
+            # Only include courses with assigned grades
+            if grade is not None:
+                total_points += grade.grade_point * course.credits
+                total_credits += course.credits
+        
+        # Return 0.0 if no graded courses
+        if total_credits == 0:
+            return 0.0
+        
+        return round(total_points / total_credits, 2)
+    
+    def generate_transcript(self):
+        """
+        Generate a formatted transcript
+        
+        Returns:
+            str: Formatted transcript string
+        """
+        transcript = f"\n{'='*60}\n"
+        transcript += f"TRANSCRIPT - {self.name} (ID: {self.student_id})\n"
+        transcript += f"{'='*60}\n\n"
+        
+        if not self.enrollments:
+            transcript += "No courses enrolled.\n"
+            transcript += f"\nCumulative GPA: 0.00\n"
+            transcript += f"{'='*60}\n"
+            return transcript
+        
+        transcript += f"{'Course ID':<12} {'Course Name':<25} {'Credits':<8} {'Grade':<8}\n"
+        transcript += f"{'-'*60}\n"
+        
+        for course_id, enrollment in self.enrollments.items():
+            course = enrollment['course']
+            grade = enrollment['grade']
+            grade_str = grade.letter_grade if grade else "N/A"
+            
+            transcript += f"{course.course_id:<12} {course.name:<25} "
+            transcript += f"{course.credits:<8} {grade_str:<8}\n"
+        
+        transcript += f"\n{'='*60}\n"
+        transcript += f"Cumulative GPA: {self.calculate_gpa():.2f}\n"
+        transcript += f"{'='*60}\n"
+        
+        return transcript
+    
+    def __repr__(self):
+        return f"Student({self.student_id}, {self.name}, GPA: {self.calculate_gpa()})"
+
+
+# ============================================================================
+# UNIT TESTS
+# ============================================================================
+
+import unittest
+
+
+class TestCourse(unittest.TestCase):
+    """Test cases for Course class"""
+    
+    def test_course_creation(self):
+        """Test creating a valid course"""
+        course = Course("CS101", "Intro to Programming", 3)
+        self.assertEqual(course.course_id, "CS101")
+        self.assertEqual(course.name, "Intro to Programming")
+        self.assertEqual(course.credits, 3)
+    
+    def test_invalid_credits(self):
+        """Test that negative or zero credits raise error"""
+        with self.assertRaises(ValueError):
+            Course("CS101", "Test Course", 0)
+        with self.assertRaises(ValueError):
+            Course("CS101", "Test Course", -1)
+
+
+class TestGrade(unittest.TestCase):
+    """Test cases for Grade class"""
+    
+    def test_valid_grades(self):
+        """Test all valid grade values"""
+        valid_grades = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 
+                       'C+', 'C', 'C-', 'D+', 'D', 'D-', 'F']
+        for grade_letter in valid_grades:
+            grade = Grade(grade_letter)
+            self.assertEqual(grade.letter_grade, grade_letter)
+            self.assertIsNotNone(grade.grade_point)
+    
+    def test_invalid_grades_rejected(self):
+        """Test that invalid grade values are rejected"""
+        invalid_grades = ['E', 'X', 'A+B', '100', '', 'a', 'Pass']
+        for invalid_grade in invalid_grades:
+            with self.assertRaises(ValueError):
+                Grade(invalid_grade)
+    
+    def test_grade_points(self):
+        """Test specific grade point mappings"""
+        self.assertEqual(Grade('A').grade_point, 4.0)
+        self.assertEqual(Grade('B').grade_point, 3.0)
+        self.assertEqual(Grade('C').grade_point, 2.0)
+        self.assertEqual(Grade('F').grade_point, 0.0)
+
+
+class TestStudent(unittest.TestCase):
+    """Test cases for Student class"""
+    
+    def setUp(self):
+        """Set up test fixtures"""
+        self.student = Student("S001", "Alice Johnson")
+        self.course1 = Course("CS101", "Programming", 3)
+        self.course2 = Course("MATH201", "Calculus", 4)
+        self.course3 = Course("ENG101", "English", 3)
+    
+    def test_student_creation(self):
+        """Test creating a student"""
+        self.assertEqual(self.student.student_id, "S001")
+        self.assertEqual(self.student.name, "Alice Johnson")
+        self.assertEqual(len(self.student.enrollments), 0)
+    
+    def test_course_enrollment(self):
+        """Test enrolling in courses"""
+        self.student.enroll_course(self.course1)
+        self.assertIn("CS101", self.student.enrollments)
+        self.assertEqual(len(self.student.enrollments), 1)
+    
+    def test_duplicate_enrollment(self):
+        """Test that duplicate enrollment raises error"""
+        self.student.enroll_course(self.course1)
+        with self.assertRaises(ValueError):
+            self.student.enroll_course(self.course1)
+    
+    def test_grade_assignment(self):
+        """Test assigning grades to courses"""
+        self.student.enroll_course(self.course1)
+        self.student.assign_grade("CS101", "A")
+        
+        grade = self.student.enrollments["CS101"]['grade']
+        self.assertIsNotNone(grade)
+        self.assertEqual(grade.letter_grade, "A")
+    
+    def test_assign_grade_not_enrolled(self):
+        """Test assigning grade to non-enrolled course fails"""
+        with self.assertRaises(ValueError):
+            self.student.assign_grade("CS101", "A")
+    
+    def test_gpa_calculation_accurate(self):
+        """Test GPA calculation is accurate"""
+        # Enroll in courses
+        self.student.enroll_course(self.course1)  # 3 credits
+        self.student.enroll_course(self.course2)  # 4 credits
+        
+        # Assign grades
+        self.student.assign_grade("CS101", "A")    # 4.0 * 3 = 12.0
+        self.student.assign_grade("MATH201", "B")  # 3.0 * 4 = 12.0
+        
+        # Total: 24.0 points / 7 credits = 3.43
+        gpa = self.student.calculate_gpa()
+        self.assertEqual(gpa, 3.43)
+    
+    def test_gpa_with_mixed_grades(self):
+        """Test GPA with various grades"""
+        self.student.enroll_course(self.course1)  # 3 credits
+        self.student.enroll_course(self.course2)  # 4 credits
+        self.student.enroll_course(self.course3)  # 3 credits
+        
+        self.student.assign_grade("CS101", "A+")    # 4.0 * 3 = 12.0
+        self.student.assign_grade("MATH201", "C")   # 2.0 * 4 = 8.0
+        self.student.assign_grade("ENG101", "B-")   # 2.7 * 3 = 8.1
+        
+        # Total: 28.1 / 10 = 2.81
+        gpa = self.student.calculate_gpa()
+        self.assertEqual(gpa, 2.81)
+    
+    def test_gpa_no_courses_returns_zero(self):
+        """Test that students with no courses return GPA as 0"""
+        gpa = self.student.calculate_gpa()
+        self.assertEqual(gpa, 0.0)
+    
+    def test_gpa_enrolled_but_no_grades(self):
+        """Test GPA for enrolled courses without assigned grades"""
+        self.student.enroll_course(self.course1)
+        self.student.enroll_course(self.course2)
+        
+        # No grades assigned yet
+        gpa = self.student.calculate_gpa()
+        self.assertEqual(gpa, 0.0)
+    
+    def test_gpa_partial_grades(self):
+        """Test GPA calculation with some ungraded courses"""
+        self.student.enroll_course(self.course1)
+        self.student.enroll_course(self.course2)
+        
+        # Only grade one course
+        self.student.assign_grade("CS101", "A")  # 4.0 * 3 = 12.0 / 3 = 4.0
+        
+        gpa = self.student.calculate_gpa()
+        self.assertEqual(gpa, 4.0)
+    
+    def test_transcript_generation(self):
+        """Test transcript generation"""
+        self.student.enroll_course(self.course1)
+        self.student.assign_grade("CS101", "A")
+        
+        transcript = self.student.generate_transcript()
+        
+        self.assertIn("Alice Johnson", transcript)
+        self.assertIn("CS101", transcript)
+        self.assertIn("Programming", transcript)
+        self.assertIn("4.00", transcript)  # GPA
+
+
+class TestGPAEdgeCases(unittest.TestCase):
+    """Test edge cases for GPA calculation"""
+    
+    def test_perfect_gpa(self):
+        """Test perfect 4.0 GPA"""
+        student = Student("S002", "Bob Smith")
+        
+        courses = [
+            Course("CS101", "Course 1", 3),
+            Course("CS102", "Course 2", 3),
+            Course("CS103", "Course 3", 4)
+        ]
+        
+        for course in courses:
+            student.enroll_course(course)
+            student.assign_grade(course.course_id, "A")
+        
+        self.assertEqual(student.calculate_gpa(), 4.0)
+    
+    def test_failing_gpa(self):
+        """Test GPA with all F grades"""
+        student = Student("S003", "Charlie Brown")
+        
+        courses = [
+            Course("CS101", "Course 1", 3),
+            Course("CS102", "Course 2", 4)
+        ]
+        
+        for course in courses:
+            student.enroll_course(course)
+            student.assign_grade(course.course_id, "F")
+        
+        self.assertEqual(student.calculate_gpa(), 0.0)
+    
+    def test_single_course_gpa(self):
+        """Test GPA with only one course"""
+        student = Student("S004", "Diana Prince")
+        course = Course("PHYS101", "Physics", 5)
+        
+        student.enroll_course(course)
+        student.assign_grade("PHYS101", "B+")
+        
+        # B+ = 3.3
+        self.assertEqual(student.calculate_gpa(), 3.3)
+
+
+# Run tests
+if __name__ == '__main__':
+    # Run unit tests
+    print("Running Unit Tests...")
+    print("=" * 70)
+    unittest.main(argv=[''], verbosity=2, exit=False)
+    
+    # Demo usage
+    print("\n\n" + "=" * 70)
+    print("DEMO: Example Usage")
+    print("=" * 70)
+    
+    # Create a student
+    student = Student("S12345", "John Doe")
+    
+    # Create and enroll in courses
+    courses = [
+        Course("CS101", "Introduction to Programming", 3),
+        Course("MATH201", "Calculus II", 4),
+        Course("ENG101", "English Composition", 3),
+        Course("PHYS101", "Physics I", 4)
+    ]
+    
+    for course in courses:
+        student.enroll_course(course)
+    
+    # Assign grades
+    student.assign_grade("CS101", "A")
+    student.assign_grade("MATH201", "B+")
+    student.assign_grade("ENG101", "A-")
+    student.assign_grade("PHYS101", "B")
+    
+    # Generate and print transcript
+    print(student.generate_transcript())
+    
+    print(f"\nStudent Info: {student}")
